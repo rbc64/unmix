@@ -19,6 +19,21 @@ Split any audio or video into layers: a clean **Voice** layer, **Drums & hits**,
 - **Mixer:** play/pause, click a waveform to jump, mute (M), solo (S), volume per layer, plus **Hear original** for A/B comparison. Spacebar plays/pauses.
 - **Export:** WAV 24-bit or MP3 (128 / 192 / 320 kbps), per layer, **Music bed (no voice)**, **Current mix** (respects your mute/solo/volume), or **Download all layers (.zip)**
 
+## Transcript & captions
+Load a file, then open **Transcript & captions** (or click **Transcribe…**).
+- **Transcribe from** the clean voice layer (best when there's music underneath; Unmix separates first if needed) or the original audio.
+- **Pick a model.** Each card shows its download size on your device, speed, accuracy, word-timing quality and an estimated time for your file. The recommended one is picked from your hardware. Estimates get exact after your first run.
+  - Tiny · Base · Small: precise word timing. Medium · Large-v3 Turbo: more accurate text, word timing estimated from each line.
+- **Options:** language (or auto-detect), word-level timing for animated captions, translate to English.
+- **Edit** any line by clicking it; click a time to jump the player there.
+- **Export:** SRT, VTT (32 / 42 / 60 characters per line, 1 or 2 lines), TXT, or **Word timings (JSON)** with every word's start and end, for animated captions in After Effects.
+
+### Where models are kept
+Each model downloads once, then works offline.
+- **Chrome / Edge:** click **Choose models folder…** and models are saved in that folder, surviving cleared browser data. On the offline version, choose `Unmix/models/whisper`: then any browser on this computer can use them through the Start launcher.
+- **Firefox / Safari:** models stay in browser storage. **Manage models → Save a copy (.zip)** backs one up; **Load models folder…** loads it again.
+- **Manage models** shows what's stored where, deletes models, moves browser copies into your folder, and asks the browser to protect its storage.
+
 ## Speed
 Unmix uses your graphics card (WebGPU) when the browser supports it. Chrome and Edge work best. Without a GPU it falls back to the CPU, which works but is much slower. Files over about 20 minutes can run out of browser memory, so split very long recordings first.
 
@@ -30,4 +45,4 @@ The whole folder is a static site with no server code.
 - Leave the `models` folder empty when hosting. Visitors download the model once from Hugging Face and their browser keeps it. Each visitor's own GPU does the processing, so hosting costs stay near zero.
 
 ## Credits
-Demucs v4 (Meta, MIT) via demucs-web (MIT) · ONNX Runtime Web (MIT) · lamejs MP3 encoder (LGPL).
+Demucs v4 (Meta, MIT) via demucs-web (MIT) · Whisper (OpenAI, MIT) via Transformers.js (Apache-2.0) · ONNX Runtime Web (MIT) · lamejs MP3 encoder (LGPL).

@@ -87,6 +87,7 @@
       </div>
       <div class="file-actions">
         <button class="btn ghost" id="btnChange">Change file</button>
+        <button class="btn ghost" id="btnToTranscript">Transcribe…</button>
         <button class="btn primary" id="btnSeparate" disabled>Separate into layers</button>
       </div>
     </div>
@@ -137,11 +138,128 @@
     </div>
   </section>
 
+  <!-- Transcript -->
+  <section class="card tx" id="txCard" hidden>
+    <div class="tx-head">
+      <div>
+        <h2>Transcript &amp; captions</h2>
+        <p class="muted small">Timed transcript, subtitles and word timings, made on this device. Nothing is uploaded.</p>
+      </div>
+      <button class="btn ghost" id="txManage">Manage models</button>
+    </div>
+
+    <div id="txSetup">
+      <div class="tx-row">
+        <span class="label">Transcribe from</span>
+        <div class="seg" id="txSrc">
+          <button data-src="voice" class="on">Clean voice layer</button>
+          <button data-src="original">Original audio</button>
+        </div>
+        <span class="muted small" id="txSrcNote"></span>
+      </div>
+
+      <div class="tx-row tight">
+        <span class="label">Choose a model</span>
+        <span class="muted small" id="txDevice">Checking this device…</span>
+      </div>
+      <div class="mcards" id="txModels"></div>
+
+      <div class="tx-row opts">
+        <label class="sel">Language <select id="txLang"></select></label>
+        <label class="chk"><input type="checkbox" id="txWords" checked> Word-level timing <span class="muted small">for animated captions</span></label>
+        <label class="chk"><input type="checkbox" id="txTranslate"> Translate to English</label>
+      </div>
+
+      <div class="store">
+        <div class="store-line">
+          <span class="store-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </span>
+          <span id="txStoreText">Models are saved in this browser.</span>
+          <span class="store-actions">
+            <button class="btn ghost sm" id="txPickFolder" hidden>Choose models folder…</button>
+            <button class="btn ghost sm" id="txAllowFolder" hidden>Allow folder access</button>
+            <label class="btn ghost sm" id="txLoadFolderBtn" hidden>Load models folder…<input type="file" id="txLoadFolder" webkitdirectory multiple hidden></label>
+          </span>
+        </div>
+        <details class="notice" id="txNotice">
+          <summary>Where your models are stored <span class="badge you" id="txYou"></span></summary>
+          <ul id="txNoticeList"></ul>
+          <p class="tip"><b>Tip:</b> the website and the offline (localhost) version store models separately. Use a models folder to share one copy between them.<span id="txLocalTip"></span></p>
+        </details>
+      </div>
+
+      <div class="hint" id="txHint" hidden>
+        <p id="txHintText"></p>
+        <div class="hint-actions">
+          <button class="btn primary" id="txHintFolder">Choose folder &amp; continue</button>
+          <button class="btn ghost" id="txHintBrowser">Keep it in this browser</button>
+          <label class="chk small"><input type="checkbox" id="txHintNever"> Don't ask again</label>
+        </div>
+      </div>
+
+      <div class="tx-go">
+        <button class="btn primary" id="txGo" disabled>Transcribe</button>
+        <span class="muted small" id="txGoNote"></span>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="txProg" hidden>
+      <div class="bar big"><div class="fill" id="txFill"></div></div>
+      <div class="progress-meta"><span id="txText">Preparing…</span><span><span id="txEta"></span> <button class="linkbtn" id="txStop">Stop</button></span></div>
+    </div>
+    <p class="warn small" id="txWarn" hidden></p>
+
+    <div id="txResult" hidden>
+      <div class="tx-player" id="txPlayer" hidden><audio id="txAudio" controls preload="metadata"></audio></div>
+      <div class="tx-row tight">
+        <span class="label" id="txCount"></span>
+        <span class="muted small">Click a time to jump there. Click any line to fix the text.</span>
+        <span class="spacer"></span>
+        <span class="muted small" id="txInfo"></span>
+      </div>
+      <div class="segs" id="txSegs"></div>
+      <div class="export tx-export">
+        <div class="export-format">
+          <span class="label">Captions</span>
+          <select id="txLine" title="Characters per caption line">
+            <option value="32">32 per line · vertical video</option>
+            <option value="42" selected>42 per line · standard</option>
+            <option value="60">60 per line · wide</option>
+          </select>
+          <select id="txLines" title="Lines per caption">
+            <option value="2" selected>Up to 2 lines</option>
+            <option value="1">1 line</option>
+          </select>
+        </div>
+        <div class="export-buttons">
+          <button class="btn ghost" id="txCopy">Copy text</button>
+          <button class="btn ghost" id="txTxt">TXT</button>
+          <button class="btn ghost" id="txVtt">VTT</button>
+          <button class="btn ghost" id="txJson" title="Every word with its start and end time, for animated captions">Word timings (JSON)</button>
+          <button class="btn primary" id="txSrt">Download SRT</button>
+        </div>
+        <p class="muted small" id="txExportMsg"></p>
+      </div>
+    </div>
+  </section>
+
+  <dialog class="dlg" id="txDialog">
+    <div class="dlg-head">
+      <h2>Models on this device</h2>
+      <button class="linkbtn" id="txDlgClose">Close</button>
+    </div>
+    <div id="txDlgList" class="dlg-list"></div>
+    <div class="dlg-sec" id="txDlgFolder"></div>
+    <div class="dlg-sec" id="txDlgStorage"></div>
+    <p class="muted small" id="txDlgMsg"></p>
+  </dialog>
+
   <footer class="foot">
     <p>Everything runs on this device. Your audio is never uploaded.</p>
     <p class="muted small">
-      <button class="linkbtn" id="btnForget">Remove saved model</button>
-      · Powered by Demucs v4 (Meta, MIT) · ONNX Runtime Web
+      <button class="linkbtn" id="btnForget">Remove saved separation model</button>
+      · Powered by Demucs v4 (Meta, MIT) · Whisper (OpenAI, MIT) via Transformers.js · ONNX Runtime Web
     </p>
   </footer>
 </div>
