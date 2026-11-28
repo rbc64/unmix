@@ -1,2 +1,4 @@
 models/*.onnx
 models/*.part
+models/whisper/*
+!models/whisper/README.txt

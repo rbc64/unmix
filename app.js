@@ -1,4 +1,5 @@
 // Unmix — main app: file loading, separation, layer mixer, export.
+import { initTranscriber } from './transcribe.js';
 const SR = 44100;
 const LAYERS = [
   { key: 'vocals', name: 'Voice', desc: 'Voiceover, dialogue and singing', color: '--voice', gate: true, file: 'Voice' },
@@ -23,8 +24,10 @@ const state = {
   layer: {},               // key -> { mute, solo, vol, el, canvas, head }
   format: 'wav',
   kbps: 192,
-  busy: false
+  busy: false,
+  txBusy: false
 };
+let tx = null; // transcription panel (transcribe.js)
 
 /* ---------------- workers ---------------- */
 window.__unmixBooted = true;
@@ -109,6 +112,7 @@ sepWorker.onmessage = (ev) => {
     case 'error':
       if (m.during === 'separate') {
         state.busy = false;
+        settleSep(new Error(m.message));
         $('progressWrap').hidden = true;
         showWarn('Separation failed: ' + m.message + (state.duration > 900 ? ' — the file may be too long for the browser. Try a shorter section.' : ''));
         updateSeparateButton();
@@ -173,14 +177,14 @@ drop.addEventListener('click', (e) => {
   $('fileInput').click();
 });
 drop.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !drop.classList.contains('has-file')) $('fileInput').click(); });
-$('btnChange').onclick = (e) => { e.stopPropagation(); if (!state.busy) $('fileInput').click(); };
+$('btnChange').onclick = (e) => { e.stopPropagation(); if (!state.busy && !state.txBusy) $('fileInput').click(); };
 $('fileInput').onchange = (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; };
 ['dragenter', 'dragover'].forEach((t) => window.addEventListener(t, (e) => { e.preventDefault(); if (!state.busy) drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach((t) => window.addEventListener(t, (e) => { e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) drop.classList.remove('over'); }));
 window.addEventListener('drop', (e) => {
   drop.classList.remove('over');
   const f = e.dataTransfer && e.dataTransfer.files[0];
-  if (f && !state.busy) loadFile(f);
+  if (f && !state.busy && !state.txBusy) loadFile(f);
 });
 
 function showWarn(t) { $('fileWarn').textContent = t; $('fileWarn').hidden = !t; }
@@ -210,25 +214,36 @@ async function loadFile(file) {
     state.duration = ab.duration;
     $('fileMeta').textContent = `${fmtTime(ab.duration)} · ${ab.numberOfChannels > 1 ? 'stereo' : 'mono'} · ${(file.size / 1048576).toFixed(1)} MB`;
     if (ab.duration > 20 * 60) showWarn('Long file: over 20 minutes can run out of browser memory. If it fails, split it into shorter parts.');
+    state.stems = null;
+    $('results').hidden = true;
   } catch (e) {
     state.original = null;
     $('fileMeta').textContent = '';
     showWarn('Could not read the audio in this file. Try MP3, WAV, M4A or MP4 — or export the audio from your editor first.');
   }
+  if (tx) tx.onFile(state.original ? file : null);
   updateSeparateButton();
 }
 
 function updateSeparateButton() {
   const b = $('btnSeparate');
-  b.disabled = !(state.original && state.modelReady && !state.busy);
-  b.title = !state.modelReady ? 'Waiting for the model to load' : '';
+  b.disabled = !(state.original && state.modelReady && !state.busy && !state.txBusy);
+  b.title = !state.modelReady ? 'Waiting for the model to load' : state.txBusy ? 'Waiting for the transcription to finish' : '';
+  if (tx) tx.sync();
 }
 
 /* ---------------- separation ---------------- */
 let sepStart = 0;
-$('btnSeparate').onclick = (e) => {
-  e.stopPropagation();
-  if (!state.original || !state.modelReady) return;
+let sepWaiters = [];
+function settleSep(err) {
+  const w = sepWaiters; sepWaiters = [];
+  w.forEach((p) => (err ? p.reject(err) : p.resolve()));
+}
+$('btnSeparate').onclick = (e) => { e.stopPropagation(); startSeparation().catch(() => {}); };
+function startSeparation() {
+  if (!state.original || !state.modelReady) return Promise.reject(new Error('The separation model is not ready.'));
+  if (state.busy) return new Promise((resolve, reject) => sepWaiters.push({ resolve, reject }));
+  const done = new Promise((resolve, reject) => sepWaiters.push({ resolve, reject }));
   state.busy = true;
   updateSeparateButton();
   showWarn('');
@@ -241,7 +256,8 @@ $('btnSeparate').onclick = (e) => {
   sepStart = performance.now();
   const l = state.original.left.slice(), r = state.original.right.slice();
   sepWorker.postMessage({ type: 'separate', left: l.buffer, right: r.buffer }, [l.buffer, r.buffer]);
-};
+  return done;
+}
 
 function onSepProgress(p, elapsed) {
   $('sepFill').style.width = (p * 100).toFixed(1) + '%';
@@ -255,6 +271,7 @@ function onSepProgress(p, elapsed) {
 
 function onSepResult(stems, seconds, backend) {
   state.busy = false;
+  settleSep(null);
   state.stems = stems;
   state.voiceGated = null;
   state.gateAmount = 0;
@@ -488,7 +505,8 @@ function tick() {
 $('btnPlay').onclick = () => (playing ? pause() : play());
 $('btnStop').onclick = () => stopPlayback(true);
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && state.stems && !['INPUT', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+  const ae = document.activeElement;
+  if (e.code === 'Space' && state.stems && !['INPUT', 'SELECT', 'BUTTON', 'AUDIO'].includes(ae.tagName) && !ae.isContentEditable) {
     e.preventDefault(); playing ? pause() : play();
   }
 });
@@ -614,6 +632,24 @@ async function makeZip(files) {
   end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }
+
+/* ---------------- transcription ---------------- */
+tx = initTranscriber({
+  hasStems: () => !!state.stems,
+  canSeparate: () => state.modelReady,
+  separate: () => startSeparation(),
+  getOriginal: () => state.original,
+  getVoice: () => (state.stems ? layerData('vocals') : null),
+  sampleRate: () => SR,
+  seekPlay: (t) => { seek(t); if (!playing) play(); },
+  isPlaying: () => playing,
+  position: () => position(),
+  duration: () => state.duration,
+  baseName: () => state.baseName,
+  fileName: () => (state.file ? state.file.name : ''),
+  isBusy: () => state.busy,
+  onTxBusy: (on) => { state.txBusy = on; updateSeparateButton(); }
+});
 
 /* ---------------- go ---------------- */
 startEngine(false);
